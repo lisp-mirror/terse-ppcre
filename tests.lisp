@@ -1,0 +1,165 @@
+;;;; -*- Mode: Lisp; Syntax: ANSI-Common-Lisp; Base: 10 -*-
+
+;;; Tests for terse-ppcre
+
+(defpackage #:terse-ppcre-tests
+  (:use :cl :fiveam :terse-ppcre :terse-ppcre-synonyms :ppcre)
+;  (:shadowing-import-from
+;  terse-ppcre
+;)
+  )
+
+(in-package :terse-ppcre-tests)
+
+
+(def-suite all
+    :description "All terse-ppcre tests")
+
+(in-suite all)
+
+(defun ts (&rest stub) (declare (ignore stub)))
+
+(test transform-symbol
+  (setf (symbol-function 'ts) #'terse-ppcre::transform-regex-symbol)
+  (is (equal :word-boundary (ts 'b)))
+  (is (equal :non-word-boundary (ts '!b)))
+  (is (equal :modeless-end-anchor-no-newline (ts 'zn)))
+  (is (equal '(:back-reference "FOO12") (ts '/foo12)))
+  (is (equal '(:back-reference 123) (ts '/123)))
+  (is (equal '(:back-reference 1) (ts '/1))))
+
+
+(defun tc (&rest stub) (declare (ignore stub)))
+
+(test transform-combination
+  (setf (symbol-function 'tc) #'terse-ppcre::transform-regex-combination)
+  (is (equal '(:branch 1 (:alternation :digit-class "no"))
+             (tc '(if 1 d "no"))))
+  (is (equal '(:branch (:positive-lookahead "scout") (:alternation "yes" (:group "no")))
+             (tc '(if (?= "scout") "yes" (all "no")))))
+  (is (equal '(:branch 2 (:alternation :word-char-class)) (tc '(if 2 w))))
+  (signals error (tc '(if a "yes")))
+  (signals error (tc '(if 1)))
+  (signals error (tc '(if 2 "a" "b" "c")))
+  (is (equal (values '(:group :case-insensitive-p :single-line-mode-p :multi-line-mode-p) '("test"))
+             (tc '(?ism "test"))))
+  (is (equal (values '(:group :case-sensitive-p :not-single-line-mode-p :not-multi-line-mode-p) '("test"))
+             (tc '(?-ism "test"))))
+  (is (equal (values '(:group :single-line-mode-p :multi-line-mode-p :case-sensitive-p) '("test"))
+             (tc '(?smms-iii "test"))))
+  (signals error (tc '({ "foo")))
+  (signals error (tc '({ })))
+  (signals error (tc '({ "foo" })))
+  (signals error (tc '({ "foo" } "test")))
+  (signals error (tc '({ 1 2 3 } "test")))
+  (signals error (tc '({ 1 2 "foo" } "test")))
+  (signals error (tc '({ }?)))
+  (signals error (tc '({ "foo" }?)))
+  (signals error (tc '({ "foo" }? "test")))
+  (signals error (tc '({ 1 2 3 }? "test")))
+  (signals error (tc '({ 1 2 "foo" }? "test")))
+  (is (equal (values '(:greedy-repetition 4 nil) '("test")) (tc '({ 4 } "test"))))
+  (is (equal (values '(:greedy-repetition 4 8) '("test")) (tc '({ 4 8 } "test"))))
+  (is (equal (values '(:non-greedy-repetition 3 nil) '("test")) (tc '({ 3 }? "test"))))
+  (is (equal (values '(:non-greedy-repetition 3 10) '("test")) (tc '({ 3 10 }? "test"))))
+  (is (equal (values '(:greedy-repetition 0 nil) '("test")) (tc '(* "test"))))
+  (is (equal (values '(:non-greedy-repetition 0 nil) '("many")) (tc '(*? "many"))))
+  (is (equal (values '(:non-greedy-repetition 0 nil) '("many")) (tc '(*? "many"))))
+  (is (equal (values '(:non-greedy-repetition 1 nil) '("many")) (tc '(+? "many"))))
+  (is (equal (values '(:non-greedy-repetition 1 nil) '("many")) (tc '(+? "many"))))
+)
+
+(test re-macro
+  (is (equal '(:sequence "a") (re "a")))
+  (is (equal ':digit-class (re d)))
+  (is (equal '(:sequence :digit-class) (re (d))))
+  (is (equal '(:sequence :digit-class :digit-class) (re d d)))
+  (is (equal '(:sequence "a") (re ("a"))))
+  (is (equal '(:sequence "a" "b") (re ("a" "b"))))
+  (is (equal '(:sequence (:sequence "a") "b") (re ("a") "b")))
+  (is (equal '(:sequence "a" "b") (re "a" "b")))
+  (is (equal '(:sequence :digit-class :word-char-class
+               :whitespace-char-class :word-boundary) (re d w s b)))
+  (is (equal '(:SEQUENCE (:GREEDY-REPETITION 1 NIL "a")
+                        (:GREEDY-REPETITION 1 NIL "b")) (re (+ "a") (+ "b"))))
+  (is (equal '(:sequence
+               (:negative-lookbehind
+                "|")
+               "|"
+               #\Newline
+               (:negative-lookahead
+                (:alternation
+                 "|"
+                 #\Newline))) (re (?<! "|") "|" #\Newline (?! (or "|" #\Newline)))))
+  (is (equal '(:branch 1 (:alternation :digit-class "no"))
+             (re (if 1 d "no"))))
+  (is (equal '(:branch (:positive-lookahead "scout") (:alternation "yes" :digit-class))
+             (re (if (?= "scout") "yes" d))))
+  (is (equal '(:branch 2 (:alternation :word-char-class)) (re (if 2 w))))
+  (is (equal '(:sequence (:named-register "TEST" (:sequence :everything))
+               (:back-reference "TEST")) (re (nr test any) /test)))
+)
+
+
+(test re-macro-in-action
+  (let ((cl-ppcre:*allow-named-registers* t))
+    (is (scan (re "test++") "  test++  "))
+    (is (not (scan (re "test+") "  test  ")))
+    (is (scan (re "a" (+ "bo") "c") "aboboboc"))
+    (is (scan (re "a" b any b "c") "a c"))
+    (is (not (scan (re "a" b any b "c") "adc")))
+    (is (scan (re "a" !b any !b "c") "adc"))
+    (is (scan (re d d !d !d) "92ab"))
+    (is (not (scan (re d d) "9b")))
+    (is (not (scan (re !d !d) "9b")))
+    (is (scan (re w w w w) "9bA_"))
+    (is (not (scan (re w w w !w) "9bA_")))
+    (is (scan (re any s any !s any) "a bcd"))
+    (is (not (scan (re any s any !s any) "aabcd")))
+    (is (not (scan (re any s any !s any) "a b d")))
+    (is (scan (re ^ "foo") "foo"))
+    (is (not (scan (re ^ "foo") "   \nfoo")))
+    (is (not (scan (re ^ "foo") (format nil "bar ~%foo"))))
+    (is (not (scan (re "bar" $) (format nil "bar~%foo"))))
+    (is (scan (re (?m ^ "foo" $)) (format nil "bar ~%foo~%baz")))
+    (is (not (scan (re (?m a "foo" z)) (format nil "bar ~%foo~%baz"))))
+    (is (scan (re (?m a "foo" z)) (format nil "foo")))
+    (is (scan (re (?m a "foo" z)) (format nil "foo~%")))
+    (is (scan (re (?m a "foo" zn)) (format nil "foo")))
+    (is (not (scan (re (?m a "foo" zn)) (format nil "foo~%"))))
+    (is (not (scan (re (?m a "foo" z)) (format nil "~%foo~%"))))
+    (is (scan (re ^ (r any any) /1) "abab"))
+    (is (scan (re ^ (r any any) /1 s /1) "abab ab"))
+    (is (scan (re (nr test any any) /test) "abab"))
+    (is (scan (re (do "a" "b")) "ab"))
+    (is (scan (re (all "a" "b")) "ab"))
+    (is (scan (re (or "a" "b")) "a"))
+    (is (scan (re (or "a" "b")) "b"))
+    (is (scan (re "a" (?= "b")) "ab"))
+    (is (not (scan (re "a" (?= "b")) "ac")))
+    (is (scan (re [] (- #\A #\Z) (- #\0 #\5)) "C"))
+    (is (scan (re ^ (+ ([] (- #\A #\Z) (- #\0 #\5))) $) "FGH234"))
+    (is (not (scan (re [] (- #\A #\Z) (- #\0 #\5)) "a")))
+    (is (not (scan (re [] (- #\A #\Z) (- #\0 #\5)) "m")))
+    (is (scan (re ^ (+ ([^] (- #\A #\Z) (- #\0 #\5))) $) "maou896"))
+    (is (scan (re * "a") ""))
+    (is (scan (re (* "a") b) "b"))
+    (is (scan (re (* "a") b) "aaab"))
+    (is (scan (re "a+") "a+"))
+    (is (not (scan (re "a+") "aaaa")))
+    (is (scan (re / "a+") "aaaa"))
+    (is (scan (re (r d) (if 1 "a" "b")) "1a"))
+    (is (scan (re (r (? d)) (if 1 "a" "b")) "ca"))
+    (is (scan (re (if (?<= d) "a" "b")) "cb"))
+    (is (scan (re (if (?<= d) "a" "b")) "2a"))
+    (is (scan (re (if (?<= d) "a") "b") "2ab"))
+    (is (scan (re (if (?<= d) "a") "b") "db"))
+    (is (scan (re ?i "a") "A"))
+    (is (scan (re ?i "aBb") "AbB"))
+    (is (not (scan (re ?i (?-i "aBb")) "AbB")))
+    (is (scan (re ?im "aa" $) (format nil "AA~%foo")))
+    (is (scan (re "a" ({ 3 4 } d) "b") "a1234b"))
+    (is (scan (re "a" ({ 3 4 } d) "b") "a123b"))
+    (is (not (scan (re "a" ({ 3 4 } d) "b") "a12b")))
+    (is (not (scan (re "a" ({ 3 4 } d) "b") "a12345b")))
+))

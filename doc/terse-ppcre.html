@@ -1,0 +1,209 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="cludg.css"/>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1"/>
+<title>
+terse-ppcre</title>
+</head>
+<body>
+<div id="navbar">
+<table cellspacing="0" cellpadding="0" border="0" style="width: 100%;">
+<colgroup span="3">
+<col width="0*"/>
+<col width="0*"/>
+<col width="1*"/>
+</colgroup>
+<tr>
+<td align="left" valign="baseline">
+<a href="packages.html">
+Prev:&nbsp;packages</a>
+<br/>
+</td>
+<td>
+&nbsp;&nbsp;&nbsp;&nbsp;</td>
+<td align="left" valign="baseline">
+<span class="upchain">
+<b>
+terse-ppcre</b>
+<br/>
+<a href="index.html">
+Index</a>
+</span>
+&nbsp;&nbsp;&nbsp;&nbsp;</td>
+</tr>
+</table>
+</div>
+<div class="cludg-doc-body">
+<h2>
+terse-ppcre
+</h2>
+<table style="width: 100%;" class="summary-table">
+<tr class="table-heading-color">
+<th class="summary" colspan="2">
+Macro summary</th>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="terse-ppcre.html#_g4022">
+defre</a>
+</td>
+<td class="summary">
+name <em>&amp;rest</em> parse-tree</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="terse-ppcre.html#_g4021">
+re</a>
+</td>
+<td class="summary">
+<em>&amp;body</em> regex</td>
+</tr>
+</table>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g4021">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+re&nbsp;&nbsp;</td>
+<td class="lambda-list">
+<em>&amp;body</em> regex</td>
+<td class="symbol-type">
+&nbsp;[Macro]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Transform a terse regex parse tree into one that CL-PPCRE can 
+ understand. Note that you can enclose the regex as a list or not, either way 
+ should work. 
+ </p>
+<p>
+usage: (re [REGEX TREE]) 
+ </p>
+<p>
+Examples: 
+ </p>
+<p>
+</p>
+<pre>
+     (re * d) ; same as &quot;\\d*&quot; 
+     (re (^ (or (+ #\A) (+ #\B)) $)) ; same as &quot;^(?:A+|B+)$&quot; </pre>
+<p>
+Symbolic substitutions: 
+ </p>
+<pre>
+     any =&gt; :everything 
+     b   =&gt; :word-boundary 
+     !b  =&gt; :non-word-boundary 
+     d   =&gt; :digit-class 
+     !d  =&gt; :non-digit-class 
+     w   =&gt; :word-char-class 
+     !w  =&gt; :non-word-char-class 
+     s   =&gt; :whitespace-char-class 
+     !s  =&gt; :non-whitespace-char-class 
+     ^   =&gt; :start-anchor 
+     $   =&gt; :end-anchor 
+     a   =&gt; :modeless-start-anchor 
+     z   =&gt; :modeless-end-anchor 
+     zn  =&gt; :modeless-end-anchor-no-newline 
+     /1  =&gt; (:back-reference 1) 
+     /hi =&gt; (:back-reference &quot;HI&quot;) </pre>
+<p>
+Combinations of (any d !d w !w s !s) and (? * *? + +?), such as 
+ </p>
+<pre>
+     d+   =&gt; (:greedy-repetition 1 nil :digit-class) 
+     any? =&gt; (:greedy-repetition 0 1 :everything) 
+     s*?  =&gt; (:non-greedy-repetition 0 nil :whitespace-char-class) </pre>
+<p>
+List transformations: 
+ </p>
+<pre>
+     (do ...)       =&gt; (:sequence ...) 
+     (all ...)      =&gt; (:group ...) 
+     (g ...)        =&gt; (:group ...) 
+     (or ...)       =&gt; (:alternation ...) 
+     (?= ...)       =&gt; (:positive-lookahead ...) 
+     (?! ...)       =&gt; (:negative-lookahead ...) 
+     (?&lt;= ...)      =&gt; (:positive-lookbehind ...) 
+     (?&lt;! ...)      =&gt; (:negative-lookbehind ...) 
+     (? ...)        =&gt; (:greedy-repetition 0 1 ...) 
+     (* ...)        =&gt; (:greedy-repetition 0 nil ...) 
+     (+ ...)        =&gt; (:greedy-repetition 1 nil ...) 
+     (*? ...)       =&gt; (:non-greedy-repetition 0 nil ...) 
+     (+? ...)       =&gt; (:non-greedy-repetition 1 nil ...) 
+     ({ X } ...)    =&gt; (:greedy-repetition X nil ...) 
+     ({ X }? ...)   =&gt; (:non-greedy-repetition X nil ...) 
+     ({ X Y } ...)  =&gt; (:greedy-repetition X Y ...) 
+     ({ X Y }? ...) =&gt; (:non-greedy-repetition X Y ...) 
+     (/ ...)        =&gt; (:regex ...) 
+     ([] ...)       =&gt; (:char-class ...) 
+     ([^] ...)      =&gt; (:inverted-char-class ...) 
+     (- ...)        =&gt; (:range ...)) 
+     ;; any combiniation of i/s/m/- works 
+     (?ism-ism ...) =&gt; (:group :case-insensitive-p :single-line-mode-p     :multi-line-mode-p 
+                               :case-sensitive-p   :not-single-line-mode-p :not-multi-line-mode-p ...) 
+     (r ...)               =&gt; (:register (:sequence ...)) 
+     (nr foo ...)          =&gt; (:name-register &quot;FOO&quot; (:sequence ...)) 
+     (if 1 ...)            =&gt; (:branch 1 (:alternation ...)) 
+     (if (?= AAA) BBB CCC) =&gt; (:branch (:positive-lookahead AAA) (:alternation BBB CCC)) 
+     (...)          =&gt; (:sequence ...) *only when nothing else matches </pre>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g4022">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+defre&nbsp;&nbsp;</td>
+<td class="lambda-list">
+name <em>&amp;rest</em> parse-tree</td>
+<td class="symbol-type">
+&nbsp;[Macro]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Define a parse tree synonym using the RE macro. 
+ </p>
+<p>
+Example: 
+ </p>
+<p>
+</p>
+<pre>
+     (defre anyjunk ?s (* any)) ; matches a series of any number of 
+                                ; any characters, including newlines 
+     (scan (re &quot;A&quot; anyjunk &quot;Z&quot;) &quot;A @#$&amp;^[&amp; Z&quot;) </pre>
+</div>
+</div>
+</div>
+<div class="cludg-footer">
+Generated by&nbsp;<a href="mailto:ihatchondo@common-lisp.net" lang="en">
+CLDOC</a>
+- 2007-10-17 18:47:55</div>
+</body>
+</html>
